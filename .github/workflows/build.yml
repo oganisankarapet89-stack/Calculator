@@ -1,4 +1,4 @@
-name: Build APK (STABLE FIX)
+name: Build APK SAFE
 
 on:
   push:
@@ -12,18 +12,24 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Build APK (NO ANDROID SDK INSTALL)
+    - name: Install dependencies
       run: |
-        docker run --rm \
-        -v $PWD:/app \
-        -w /app \
-        kivy/buildozer \
-        bash -c "
-          pip install --upgrade pip &&
-          pip install cython==0.29.36 &&
-          buildozer init || true &&
-          buildozer android debug
-        "
+        sudo apt update
+        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip
+        pip install --upgrade pip
+        pip install cython==0.29.36 python-for-android
+
+    - name: Build APK using p4a (NO BUILDOZER)
+      run: |
+        p4a apk \
+          --private . \
+          --package=org.test.calculator \
+          --name Calculator \
+          --version 0.1 \
+          --bootstrap=sdl2 \
+          --requirements=python3,kivy \
+          --arch=arm64-v8a \
+          --output=bin/app.apk
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
