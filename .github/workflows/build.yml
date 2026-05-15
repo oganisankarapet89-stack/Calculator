@@ -1,4 +1,4 @@
-name: Build APK FINAL FIX
+name: Build APK (STABLE FIX)
 
 on:
   push:
@@ -6,34 +6,24 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install system deps
+    - name: Build APK (NO ANDROID SDK INSTALL)
       run: |
-        sudo apt update
-        sudo apt install -y git zip unzip openjdk-17-jdk \
-          python3-pip build-essential \
-          autoconf automake libtool pkg-config
-
-        pip install --upgrade pip
-        pip install cython==0.29.36 buildozer
-
-    - name: FULL RESET buildozer environment
-      run: |
-        rm -rf ~/.buildozer || true
-
-    - name: FORCE install python-for-android
-      run: |
-        pip install python-for-android==2023.9.16
-
-    - name: Build APK (NO CLEAN STEP)
-      run: |
-        export CI=1
-        buildozer -v android debug
+        docker run --rm \
+        -v $PWD:/app \
+        -w /app \
+        kivy/buildozer \
+        bash -c "
+          pip install --upgrade pip &&
+          pip install cython==0.29.36 &&
+          buildozer init || true &&
+          buildozer android debug
+        "
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
