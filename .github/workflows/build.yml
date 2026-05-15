@@ -1,4 +1,4 @@
-name: Build APK SAFE
+name: Build APK FIX AUTOTOOLS
 
 on:
   push:
@@ -6,31 +6,29 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Install full build system
       run: |
         sudo apt update
-        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip
-        pip install --upgrade pip
-        pip install cython==0.29.36 python-for-android
+        sudo apt install -y \
+          git zip unzip openjdk-17-jdk \
+          python3-pip build-essential \
+          autoconf automake libtool \
+          libtool-bin m4 pkg-config \
+          autoconf-archive
 
-    - name: Build APK using p4a (NO BUILDOZER)
+        pip install --upgrade pip
+        pip install cython==0.29.36 buildozer
+
+    - name: Build APK
       run: |
-        p4a apk \
-          --private . \
-          --package=org.test.calculator \
-          --name Calculator \
-          --version 0.1 \
-          --bootstrap=sdl2 \
-          --requirements=python3,kivy \
-          --arch=arm64-v8a \
-          --android-api=34 \
-          --output=bin/app.apk
+        export CI=1
+        buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
