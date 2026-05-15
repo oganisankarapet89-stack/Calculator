@@ -1,4 +1,4 @@
-name: Build APK NO SDK LOOP
+name: Build APK (Stable)
 
 on:
   push:
@@ -6,34 +6,40 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install system dependencies
       run: |
         sudo apt update
         sudo apt install -y \
           git zip unzip openjdk-17-jdk \
-          python3-pip build-essential
+          build-essential \
+          autoconf automake libtool \
+          pkg-config m4 \
+          libffi-dev libssl-dev
 
-        pip install --upgrade pip
-        pip install cython==0.29.36 python-for-android
-
-    - name: Build APK (NO BUILDTOOLS / NO AIDL)
+    - name: Install Python dependencies
       run: |
-        p4a apk \
-          --private . \
-          --package org.test.calculator \
-          --name Calculator \
-          --version 0.1 \
-          --bootstrap=sdl2 \
-          --requirements python3,kivy \
-          --arch arm64-v8a \
-          --android-api 34 \
-          --output bin/app.apk
+        python -m pip install --upgrade pip
+        pip install cython==0.29.36 buildozer
+
+    - name: Clean buildozer cache (safe)
+      run: |
+        rm -rf .buildozer || true
+
+    - name: Build APK
+      run: |
+        export CI=1
+        buildozer -v android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
