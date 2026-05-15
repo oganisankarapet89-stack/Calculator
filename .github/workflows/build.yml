@@ -1,4 +1,4 @@
-name: Build APK (stable docker)
+name: Build APK (FIXED)
 
 on:
   push:
@@ -8,21 +8,29 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      CI: true
+      PIP_NO_INPUT: 1
+      DEBIAN_FRONTEND: noninteractive
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Build APK in Docker (no prompts)
+    - name: Install system deps
       run: |
-        docker run --rm \
-        -e CI=1 \
-        -e PIP_BREAK_SYSTEM_PACKAGES=1 \
-        -v $PWD:/home/user/app \
-        kivy/buildozer \
-        bash -c "
-          cd /home/user/app &&
-          yes | buildozer android debug
-        "
+        sudo apt update
+        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip
+        pip install --upgrade pip
+        pip install cython==0.29.36 buildozer
+
+    - name: Force non-interactive build
+      run: |
+        export BUILDOZER_WARN_ON_ROOT=0
+        export BUILDOZER_ALWAYS_YES=1
+
+        buildozer android clean || true
+        buildozer -v android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
