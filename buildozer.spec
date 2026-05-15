@@ -9,10 +9,10 @@
 title = Calculator Karapetyan
 
 # (str) Package name
-package.name = myapp
+package.name = calculator
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = org.test
+package.domain = org.example
 
 # (str) Source code where the main.py live
 source.dir = .
