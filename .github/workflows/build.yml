@@ -1,4 +1,4 @@
-name: Build APK Stable
+name: Build APK (NO ROOT FIX)
 
 on:
   push:
@@ -6,25 +6,33 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Build APK (no interactive input)
+    - name: Install dependencies
       run: |
-        docker run --rm \
-        -v $PWD:/app \
-        -w /app \
-        -e CI=1 \
-        -e BUILDOZER_ALWAYS_YES=1 \
-        kivy/buildozer \
-        bash -c "
-          export CI=1 &&
-          export BUILDOZER_ALWAYS_YES=1 &&
-          yes | buildozer android debug
-        "
+        sudo apt update
+        sudo apt install -y \
+          git zip unzip openjdk-17-jdk \
+          python3-pip build-essential \
+          autoconf automake libtool pkg-config
+
+        pip install --upgrade pip
+        pip install cython==0.29.36 buildozer
+
+    - name: Force non-root build
+      run: |
+        export HOME=/home/runner
+        export CI=1
+        export PIP_BREAK_SYSTEM_PACKAGES=1
+
+        mkdir -p $HOME/.buildozer
+
+        buildozer android clean || true
+        buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
