@@ -1,4 +1,4 @@
-name: Build APK FIX AUTOTOOLS
+name: Build APK NO SDK LOOP
 
 on:
   push:
@@ -6,29 +6,33 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install full build system
+    - name: Install dependencies
       run: |
         sudo apt update
         sudo apt install -y \
           git zip unzip openjdk-17-jdk \
-          python3-pip build-essential \
-          autoconf automake libtool \
-          libtool-bin m4 pkg-config \
-          autoconf-archive
+          python3-pip build-essential
 
         pip install --upgrade pip
-        pip install cython==0.29.36 buildozer
+        pip install cython==0.29.36 python-for-android
 
-    - name: Build APK
+    - name: Build APK (NO BUILDTOOLS / NO AIDL)
       run: |
-        export CI=1
-        buildozer android debug
+        p4a apk \
+          --private . \
+          --package org.test.calculator \
+          --name Calculator \
+          --version 0.1 \
+          --bootstrap=sdl2 \
+          --requirements=python3,kivy \
+          --arch arm64-v8a \
+          --output bin/app.apk
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
