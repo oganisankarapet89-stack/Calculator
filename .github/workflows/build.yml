@@ -1,4 +1,4 @@
-name: Build APK FIXED
+name: Build APK FINAL FIX
 
 on:
   push:
@@ -9,10 +9,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout code
+    - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Setup environment
+    - name: Install system deps
       run: |
         sudo apt update
         sudo apt install -y git zip unzip openjdk-17-jdk \
@@ -22,20 +22,17 @@ jobs:
         pip install --upgrade pip
         pip install cython==0.29.36 buildozer
 
-    - name: Pre-create Android environment (FIX AIDL + LICENSE)
+    - name: FULL RESET buildozer environment
       run: |
-        mkdir -p $HOME/.buildozer/android/platform
-        mkdir -p $HOME/.buildozer/android/platform/android-sdk
+        rm -rf ~/.buildozer || true
 
-        yes | sdkmanager --licenses || true
-
-    - name: Build APK (NO SDK INSTALL STEP)
+    - name: FORCE install python-for-android
       run: |
-        export ANDROIDSDK="$HOME/.buildozer/android/platform/android-sdk"
-        export ANDROIDNDK="$HOME/.buildozer/android/platform/android-ndk"
+        pip install python-for-android==2023.9.16
+
+    - name: Build APK (NO CLEAN STEP)
+      run: |
         export CI=1
-
-        buildozer android clean
         buildozer -v android debug
 
     - name: Upload APK
