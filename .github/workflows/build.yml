@@ -1,4 +1,4 @@
-name: Build APK (NO ROOT FIX)
+name: Build APK FIXED
 
 on:
   push:
@@ -9,30 +9,34 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Setup environment
       run: |
         sudo apt update
-        sudo apt install -y \
-          git zip unzip openjdk-17-jdk \
+        sudo apt install -y git zip unzip openjdk-17-jdk \
           python3-pip build-essential \
           autoconf automake libtool pkg-config
 
         pip install --upgrade pip
         pip install cython==0.29.36 buildozer
 
-    - name: Force non-root build
+    - name: Pre-create Android environment (FIX AIDL + LICENSE)
       run: |
-        export HOME=/home/runner
+        mkdir -p $HOME/.buildozer/android/platform
+        mkdir -p $HOME/.buildozer/android/platform/android-sdk
+
+        yes | sdkmanager --licenses || true
+
+    - name: Build APK (NO SDK INSTALL STEP)
+      run: |
+        export ANDROIDSDK="$HOME/.buildozer/android/platform/android-sdk"
+        export ANDROIDNDK="$HOME/.buildozer/android/platform/android-ndk"
         export CI=1
-        export PIP_BREAK_SYSTEM_PACKAGES=1
 
-        mkdir -p $HOME/.buildozer
-
-        buildozer android clean || true
-        buildozer android debug
+        buildozer android clean
+        buildozer -v android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
