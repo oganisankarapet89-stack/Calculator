@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK Stable
 
 on:
   push:
@@ -8,30 +8,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:
-      ANDROIDSDK: $HOME/.buildozer/android/platform/android-sdk
-      CI: true
-
     steps:
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Build APK using official p4a Docker (NO SDK ISSUES)
       run: |
-        sudo apt update
-        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip
-        pip install --upgrade pip
-        pip install cython==0.29.36 buildozer
-
-    - name: Accept Android SDK licenses (FIX AIDL)
-      run: |
-        mkdir -p $ANDROIDSDK/licenses
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROIDSDK/licenses/android-sdk-license
-        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $ANDROIDSDK/licenses/android-sdk-license
-
-    - name: Build APK
-      run: |
-        yes | buildozer android debug
+        docker run --rm \
+        -v $PWD:/app \
+        -w /app \
+        kivy/buildozer \
+        bash -c "
+          pip install --upgrade pip &&
+          buildozer android clean &&
+          buildozer android debug
+        "
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
