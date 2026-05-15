@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK (stable)
 
 on:
   push:
@@ -12,28 +12,10 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install system deps
+    - name: Build APK using Buildozer Docker (STABLE)
       run: |
-        sudo apt update
-        sudo apt install -y \
-          git zip unzip openjdk-17-jdk \
-          python3-pip \
-          build-essential \
-          autoconf automake libtool pkg-config
-
-    - name: Install Buildozer
-      run: |
-        pip install --upgrade pip
-        pip install cython==0.29.36 buildozer
-
-    - name: Fix Android SDK + AIDL (IMPORTANT)
-      run: |
-        mkdir -p ~/.buildozer/android/platform
-        yes | buildozer android update
-
-    - name: Build APK
-      run: |
-        buildozer -v android debug
+        docker run --rm -v $PWD:/home/user/app \
+        kivy/buildozer buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
