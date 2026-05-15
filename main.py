@@ -90,5 +90,3 @@ class GlassApp(App):
 
 if __name__ == "__main__":
     GlassApp().run()
-
-print("new build trigger")
