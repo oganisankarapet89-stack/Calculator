@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK (Docker Stable)
 
 on:
   push:
@@ -8,24 +8,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:
-      CI: 1
-      BUILD_FORCE: 1
-
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Build APK in Docker (stable environment)
       run: |
-        sudo apt update
-        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip
-        pip install --upgrade pip
-        pip install buildozer cython kivy
-
-    - name: Build APK
-      run: |
-        yes | buildozer android debug
+        docker run --rm \
+        -v $PWD:/home/user/app \
+        kivy/buildozer \
+        bash -c "cd /home/user/app && buildozer android debug"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
