@@ -9,19 +9,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
+    - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Build APK using official p4a Docker (NO SDK ISSUES)
+    - name: Build APK (no interactive input)
       run: |
         docker run --rm \
         -v $PWD:/app \
         -w /app \
+        -e CI=1 \
+        -e BUILDOZER_ALWAYS_YES=1 \
         kivy/buildozer \
         bash -c "
-          pip install --upgrade pip &&
-          buildozer android clean &&
-          buildozer android debug
+          export CI=1 &&
+          export BUILDOZER_ALWAYS_YES=1 &&
+          yes | buildozer android debug
         "
 
     - name: Upload APK
