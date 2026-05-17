@@ -1,4 +1,4 @@
-name: Build APK FINAL (FIX ALL)
+name: Build APK FINAL (ABSOLUTE FIX)
 
 on:
   push:
@@ -17,14 +17,14 @@ jobs:
       with:
         python-version: '3.10'
 
-    # ✅ ФИКС Java (иначе sdkmanager падает)
-    - name: Setup Java 17
+    # ✅ Java 17 (fix sdkmanager crash)
+    - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Install system dependencies
+    - name: Install system deps
       run: |
         sudo apt update
         sudo apt install -y \
@@ -39,35 +39,36 @@ jobs:
         python -m pip install --upgrade pip
         pip install cython==0.29.36 buildozer
 
-    # 🔥 СТАВИМ SDK В НУЖНОЕ МЕСТО (.buildozer!)
-    - name: Install Android SDK (FIX AIDL FINAL)
+    # 🔥 SDK FIX (ВСЕ ПРОБЛЕМЫ РЕШЕНЫ ЗДЕСЬ)
+    - name: Install Android SDK FULL FIX
       run: |
         export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-        mkdir -p $ANDROID_HOME/cmdline-tools
+        mkdir -p $ANDROID_HOME
         cd $ANDROID_HOME
 
         wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
         unzip -q tools.zip
 
-        # правильная структура без mv-ошибки
         mkdir -p cmdline-tools/latest
         cp -r cmdline-tools/* cmdline-tools/latest/ || true
+
+        # 🔥 СОЗДАЁМ СТАРЫЙ ПУТЬ (ГЛАВНЫЙ ФИКС)
+        mkdir -p tools/bin
+        ln -s $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager tools/bin/sdkmanager
 
         export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
 
         yes | sdkmanager --licenses
 
-        # 🔥 СТАВИМ ВСЁ ЧТО НУЖНО ДЛЯ AIDL
         sdkmanager \
           "platform-tools" \
           "platforms;android-34" \
           "build-tools;34.0.0"
 
-    - name: Clean broken cache
+    - name: Clean cache
       run: |
         rm -rf .buildozer || true
 
-    # 🔥 ГЛАВНОЕ: указываем Buildozer правильный SDK путь
     - name: Build APK
       run: |
         export CI=1
