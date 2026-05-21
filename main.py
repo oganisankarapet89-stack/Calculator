@@ -9,32 +9,50 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.slider import Slider
 from kivy.uix.label import Label
-from kivy.core.window import Window
-from kivy.animation import Animation
-from kivy.clock import Clock
-from kivy.graphics import Color, RoundedRectangle, Rectangle, Ellipse
-from kivy.storage.jsonstore import JsonStore
 from kivy.uix.widget import Widget
-from kivy.properties import NumericProperty, BooleanProperty
-from kivy.utils import platform
+from kivy.uix.scrollview import ScrollView
 from kivy.uix.floatlayout import FloatLayout
 
-# ======================
-# 📱 МОБИЛЬНЫЕ НАСТРОЙКИ
-# ======================
-IS_MOBILE = (platform == 'android' or platform == 'ios')
+from kivy.core.window import Window
+from kivy.clock import Clock
+from kivy.animation import Animation
+
+from kivy.graphics import (
+    Color,
+    RoundedRectangle,
+    Rectangle,
+    Ellipse
+)
+
+from kivy.storage.jsonstore import JsonStore
+from kivy.utils import platform
+from kivy.metrics import dp, sp
+
+# =========================================================
+# 📱 MOBILE OPTIMIZATION
+# =========================================================
+
+IS_MOBILE = platform in ("android", "ios")
+
+# Оптимальные размеры для любого смартфона
+if IS_MOBILE:
+    Window.size = (dp(360), dp(640))
+    Window.fullscreen = 'auto'
+else:
+    Window.size = (400, 700)
 
 Window.clearcolor = (0, 0, 0, 1)
-Window.size = (400, 700)
 
-# ======================
-# 💾 SAVE SETTINGS
-# ======================
+# =========================================================
+# 💾 STORAGE
+# =========================================================
+
 store = JsonStore("settings.json")
 
-# ======================
-# 🎨 ТЕМЫ
-# ======================
+# =========================================================
+# 🎨 THEMES
+# =========================================================
+
 THEMES = {
     "Dark": {
         "bg": (0, 0, 0, 1),
@@ -94,118 +112,164 @@ THEMES = {
     }
 }
 
+# =========================================================
+# 🍏 IOS BUTTON
+# =========================================================
 
-# ======================
-# 🦕 DINO GAME (ПЕРЕСОЗДАЁТСЯ ПРИ РЕСТАРТЕ)
-# ======================
+class IOSButton(Button):
+    def __init__(self, bg_color, size_factor=1, **kwargs):
+        super().__init__(**kwargs)
+        self.bg_color_value = bg_color
+        self.size_factor = size_factor
+        self.background_normal = ""
+        self.background_down = ""
+        self.background_color = (0, 0, 0, 0)
+        self.color = (1, 1, 1, 1)
+        self.bold = True
+        self.font_size = sp(24 * size_factor)
+        self.size_hint_y = None
+        self.height = dp(78 * size_factor)
+        self.radius_value = dp(35)
+
+        with self.canvas.before:
+            self.bg_color = Color(*bg_color)
+            self.bg = RoundedRectangle(radius=[self.radius_value])
+
+        self.bind(pos=self.update_graphics)
+        self.bind(size=self.update_graphics)
+
+    def update_graphics(self, *args):
+        self.bg.pos = self.pos
+        self.bg.size = self.size
+
+    def on_press(self):
+        Animation(opacity=0.65, duration=0.05).start(self)
+
+    def on_release(self):
+        Animation(opacity=1, duration=0.08).start(self)
+
+    def update_theme(self, color, text, size_factor, radius=35):
+        self.bg_color.rgba = color
+        self.color = text
+        self.font_size = sp(24 * size_factor)
+        self.height = dp(78 * size_factor)
+        self.radius_value = dp(radius)
+        self.bg.radius = [self.radius_value]
+
+# =========================================================
+# 🦕 DINO GAME (ИСПРАВЛЕН - НЕТ ЧЁРНОГО ПРЯМОУГОЛЬНИКА)
+# =========================================================
+
 class DinoGame(Widget):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
         self.app = app
         self.size_hint = (1, 1)
 
-        # Загружаем рекорд
         if store.exists("game_stats"):
             data = store.get("game_stats")
             self.high_score = data.get("high_score", 0)
         else:
             self.high_score = 0
 
-        # Игровые переменные
         self.is_running = False
         self.score = 0
-        self.dino_y = 0
+        self.dino_x = 0
         self.dino_velocity = 0
-        self.gravity = -800
-        self.jump_strength = 300
         self.obstacles = []
-        self.game_speed = 200
         self.obstacle_timer = 0
 
-        # Размеры
-        self.dino_size = (35, 35)
-        self.dino_x = 60
-        self.ground_y = 80
-        self.dino_on_ground = True
-
-        # Управление
-        if IS_MOBILE:
-            self.bind(on_touch_down=self.on_touch_down)
-        else:
-            self._keyboard = Window.request_keyboard(self._keyboard_closed, self)
-            self._keyboard.bind(on_key_down=self._on_key_down)
+        self.dino_size = (dp(40), dp(40))
+        self.ground_y = dp(60)
 
         self.game_event = None
 
-        # Создаем UI
+        self.bind(size=self.update_sizes)
         Clock.schedule_once(self.setup_ui, 0.1)
-        self.bind(size=self.update_positions)
+
+    def update_sizes(self, *args):
+        if hasattr(self, 'ground'):
+            self.ground.pos = (0, self.ground_y)
+        if hasattr(self, 'dino'):
+            self.dino.pos = (self.dino_x, self.ground_y - self.dino_size[1])
 
     def setup_ui(self, dt):
-        # Рисуем фон
+        self.canvas.clear()
+        self.clear_widgets()
+
         with self.canvas:
             Color(0.1, 0.15, 0.25, 1)
             self.sky = Rectangle(pos=(0, 0), size=self.size)
 
             Color(0.35, 0.25, 0.15, 1)
-            self.ground = Rectangle(pos=(0, self.ground_y), size=(self.width, 8))
+            self.ground = Rectangle(pos=(0, self.ground_y), size=(self.width, dp(8)))
 
             Color(0.2, 0.8, 0.2, 1)
-            self.dino = RoundedRectangle(pos=(self.dino_x, self.ground_y), size=self.dino_size, radius=[8])
+            self.dino = RoundedRectangle(
+                pos=(self.dino_x, self.ground_y - self.dino_size[1]),
+                size=self.dino_size,
+                radius=[dp(8)]
+            )
 
-        # Очки
+            Color(1, 1, 1, 1)
+            self.eye = Ellipse(
+                pos=(self.dino_x + self.dino_size[0] - dp(12), self.ground_y - self.dino_size[1] + dp(8)),
+                size=(dp(8), dp(8))
+            )
+            Color(0, 0, 0, 1)
+            self.pupil = Ellipse(
+                pos=(self.dino_x + self.dino_size[0] - dp(10), self.ground_y - self.dino_size[1] + dp(10)),
+                size=(dp(4), dp(4))
+            )
+
         self.score_label = Label(
-            text=f"Score: {self.score}",
-            font_size=28,
+            text=f"Score: 0",
+            font_size=sp(26),
             color=(1, 1, 1, 1),
             size_hint=(None, None),
-            size=(200, 50)
+            size=(dp(180), dp(45))
         )
         self.add_widget(self.score_label)
 
         self.best_label = Label(
             text=f"Best: {self.high_score}",
-            font_size=20,
+            font_size=sp(20),
             color=(0.8, 0.8, 0.8, 1),
             size_hint=(None, None),
-            size=(200, 40)
+            size=(dp(180), dp(35))
         )
         self.add_widget(self.best_label)
 
-        # Кнопка выхода
         self.exit_btn = Button(
             text="EXIT",
             size_hint=(None, None),
-            size=(80, 45),
+            size=(dp(65), dp(38)),
             background_color=(0.7, 0.2, 0.2, 1),
             color=(1, 1, 1, 1),
-            font_size=18,
+            font_size=sp(15),
             bold=True,
             background_normal=''
         )
         self.exit_btn.bind(on_press=self.exit_game)
         self.add_widget(self.exit_btn)
 
-        # Стартовое меню
-        self.show_start_menu()
+        # Стартовое меню - через FloatLayout чтобы точно по центру
+        self.start_container = FloatLayout(size_hint=(1, 1))
 
-        self.update_positions()
-
-    def show_start_menu(self):
         self.start_menu = BoxLayout(
             orientation='vertical',
             size_hint=(None, None),
-            size=(260, 220),
-            spacing=15
+            size=(dp(250), dp(210)),
+            spacing=dp(12)
         )
 
         with self.start_menu.canvas.before:
-            Color(0, 0, 0, 0.9)
-            self.menu_bg = RoundedRectangle(size=self.start_menu.size, radius=[20])
+            Color(0, 0, 0, 0.92)
+            self.menu_bg = RoundedRectangle(size=self.start_menu.size, radius=[dp(20)])
 
         title = Label(
             text="🦕 DINO GAME 🦕",
-            font_size=26,
+            font_size=sp(24),
             color=(0.2, 0.8, 0.2, 1),
             size_hint=(1, 0.35),
             bold=True
@@ -217,145 +281,74 @@ class DinoGame(Widget):
             size_hint=(1, 0.35),
             background_color=(0.2, 0.6, 0.2, 1),
             color=(1, 1, 1, 1),
-            font_size=20,
+            font_size=sp(18),
             bold=True,
             background_normal=''
         )
         self.start_btn.bind(on_press=self.start_game)
         self.start_menu.add_widget(self.start_btn)
 
-        inst_text = "👇 Tap to jump" if IS_MOBILE else "␣ Space to jump"
+        inst_text = "👆 Tap left/right to move" if IS_MOBILE else "← → arrows"
         inst_label = Label(
             text=inst_text,
-            font_size=14,
+            font_size=sp(13),
             color=(0.8, 0.8, 0.8, 1),
             size_hint=(1, 0.2)
         )
         self.start_menu.add_widget(inst_label)
 
-        self.add_widget(self.start_menu)
+        self.start_container.add_widget(self.start_menu)
+        self.add_widget(self.start_container)
 
-    def show_game_over_menu(self):
-        self.game_over_menu = BoxLayout(
-            orientation='vertical',
-            size_hint=(None, None),
-            size=(260, 240),
-            spacing=15
-        )
-
-        with self.game_over_menu.canvas.before:
-            Color(0, 0, 0, 0.9)
-            self.go_bg = RoundedRectangle(size=self.game_over_menu.size, radius=[20])
-
-        go_label = Label(
-            text=f"GAME OVER!\nScore: {self.score}",
-            font_size=26,
-            color=(1, 0.3, 0.3, 1),
-            size_hint=(1, 0.45),
-            bold=True
-        )
-        self.game_over_menu.add_widget(go_label)
-
-        again_btn = Button(
-            text="PLAY AGAIN",
-            size_hint=(1, 0.3),
-            background_color=(0.2, 0.6, 0.2, 1),
-            color=(1, 1, 1, 1),
-            font_size=18,
-            bold=True,
-            background_normal=''
-        )
-        again_btn.bind(on_press=self.restart_game)
-        self.game_over_menu.add_widget(again_btn)
-
-        exit_btn2 = Button(
-            text="EXIT",
-            size_hint=(1, 0.3),
-            background_color=(0.7, 0.2, 0.2, 1),
-            color=(1, 1, 1, 1),
-            font_size=16,
-            background_normal=''
-        )
-        exit_btn2.bind(on_press=self.exit_game)
-        self.game_over_menu.add_widget(exit_btn2)
-
-        self.add_widget(self.game_over_menu)
+        self.update_positions()
 
     def update_positions(self, *args):
-        if hasattr(self, 'sky'):
-            self.sky.size = self.size
-            self.ground.size = (self.width, 8)
-
         if hasattr(self, 'score_label'):
-            self.score_label.pos = (self.width - 170, self.height - 60)
-            self.best_label.pos = (self.width - 170, self.height - 95)
-            self.exit_btn.pos = (10, self.height - 55)
+            self.score_label.pos = (self.width - dp(150), self.height - dp(55))
+            self.best_label.pos = (self.width - dp(150), self.height - dp(88))
+            self.exit_btn.pos = (dp(8), self.height - dp(45))
 
-        if hasattr(self, 'start_menu') and self.start_menu.parent:
-            self.start_menu.pos = (self.width // 2 - 130, self.height // 2 - 110)
+        if hasattr(self, 'start_container') and self.start_container.parent:
+            self.start_container.pos = (0, 0)
+            self.start_menu.pos = (self.width // 2 - dp(125), self.height // 2 - dp(105))
             if hasattr(self, 'menu_bg'):
                 self.menu_bg.pos = self.start_menu.pos
                 self.menu_bg.size = self.start_menu.size
 
-        if hasattr(self, 'game_over_menu') and self.game_over_menu and self.game_over_menu.parent:
-            self.game_over_menu.pos = (self.width // 2 - 130, self.height // 2 - 120)
+        if hasattr(self, 'game_over_container') and self.game_over_container and self.game_over_container.parent:
+            self.game_over_container.pos = (0, 0)
+            self.game_over_menu.pos = (self.width // 2 - dp(125), self.height // 2 - dp(115))
             if hasattr(self, 'go_bg'):
                 self.go_bg.pos = self.game_over_menu.pos
                 self.go_bg.size = self.game_over_menu.size
 
-    def on_touch_down(self, touch, *args):
-        # Кнопка выхода
-        if self.exit_btn.collide_point(*touch.pos):
-            self.exit_btn.dispatch('on_press')
-            return True
-
-        # Стартовое меню
-        if hasattr(self, 'start_menu') and self.start_menu.parent:
-            if self.start_btn.collide_point(*touch.pos):
-                self.start_btn.dispatch('on_press')
-                return True
-            return True
-
-        # Меню Game Over
-        if hasattr(self, 'game_over_menu') and self.game_over_menu and self.game_over_menu.parent:
+    def on_touch_down(self, touch):
+        if hasattr(self, 'exit_btn') and self.exit_btn.collide_point(*touch.pos):
+            return
+        if hasattr(self, 'start_container') and self.start_container.parent:
+            if hasattr(self, 'start_btn') and self.start_btn.collide_point(*touch.pos):
+                self.start_game(None)
+                return
+            return
+        if hasattr(self, 'game_over_container') and self.game_over_container and self.game_over_container.parent:
             for child in self.game_over_menu.children:
                 if isinstance(child, Button) and child.collide_point(*touch.pos):
                     child.dispatch('on_press')
-                    return True
-            return True
-
-        # Прыжок
-        if self.is_running and self.dino_on_ground:
-            self.dino_velocity = self.jump_strength
-            self.dino_on_ground = False
-
-        return super().on_touch_down(touch)
-
-    def _keyboard_closed(self):
-        if hasattr(self, '_keyboard') and self._keyboard:
-            self._keyboard.unbind(on_key_down=self._on_key_down)
-            self._keyboard = None
-
-    def _on_key_down(self, keyboard, keycode, text, modifiers):
-        if keycode[1] == 'space':
-            if not self.is_running and hasattr(self, 'start_menu') and self.start_menu.parent:
-                self.start_game(None)
-            elif self.is_running and self.dino_on_ground:
-                self.dino_velocity = self.jump_strength
-                self.dino_on_ground = False
-        return True
+                    return
+            return
+        if self.is_running:
+            if touch.x < self.width / 2:
+                self.dino_velocity = -380
+            else:
+                self.dino_velocity = 380
 
     def start_game(self, instance):
-        # Удаляем стартовое меню
-        if hasattr(self, 'start_menu') and self.start_menu.parent:
-            self.remove_widget(self.start_menu)
+        if hasattr(self, 'start_container') and self.start_container.parent:
+            self.remove_widget(self.start_container)
+        if hasattr(self, 'game_over_container') and self.game_over_container and self.game_over_container.parent:
+            self.remove_widget(self.game_over_container)
+            self.game_over_container = None
 
-        # Удаляем меню Game Over если есть
-        if hasattr(self, 'game_over_menu') and self.game_over_menu and self.game_over_menu.parent:
-            self.remove_widget(self.game_over_menu)
-            self.game_over_menu = None
-
-        # Удаляем ВСЕ старые кактусы
         for obs in self.obstacles:
             if hasattr(obs, 'rect'):
                 try:
@@ -364,22 +357,18 @@ class DinoGame(Widget):
                     pass
         self.obstacles.clear()
 
-        # Сбрасываем все переменные
         self.is_running = True
         self.score = 0
-        self.dino_y = 0
+        self.dino_x = self.width // 2 - self.dino_size[0] // 2
         self.dino_velocity = 0
-        self.dino_on_ground = True
-        self.game_speed = 200
         self.obstacle_timer = 0
-
-        # Обновляем очки
         self.score_label.text = "Score: 0"
 
-        # Ставим динозавра на место
-        self.dino.pos = (self.dino_x, self.ground_y)
+        if hasattr(self, 'dino'):
+            self.dino.pos = (self.dino_x, self.ground_y - self.dino_size[1])
+            self.eye.pos = (self.dino_x + self.dino_size[0] - dp(12), self.ground_y - self.dino_size[1] + dp(8))
+            self.pupil.pos = (self.dino_x + self.dino_size[0] - dp(10), self.ground_y - self.dino_size[1] + dp(10))
 
-        # Запускаем игровой цикл
         if self.game_event:
             self.game_event.cancel()
         self.game_event = Clock.schedule_interval(self.update_game, 1 / 60)
@@ -396,436 +385,259 @@ class DinoGame(Widget):
         if not self.is_running:
             return
 
-        # Физика прыжка
-        self.dino_velocity += self.gravity * dt
-        self.dino_y += self.dino_velocity * dt
+        self.dino_x += self.dino_velocity * dt
+        self.dino_velocity *= 0.98
 
-        if self.dino_y <= 0:
-            self.dino_y = 0
+        if self.dino_x <= 0:
+            self.dino_x = 0
             self.dino_velocity = 0
-            self.dino_on_ground = True
-        else:
-            self.dino_on_ground = False
+        elif self.dino_x >= self.width - self.dino_size[0]:
+            self.dino_x = self.width - self.dino_size[0]
+            self.dino_velocity = 0
 
-        self.dino.pos = (self.dino_x, self.ground_y + self.dino_y)
+        self.dino.pos = (self.dino_x, self.ground_y - self.dino_size[1])
+        self.eye.pos = (self.dino_x + self.dino_size[0] - dp(12), self.ground_y - self.dino_size[1] + dp(8))
+        self.pupil.pos = (self.dino_x + self.dino_size[0] - dp(10), self.ground_y - self.dino_size[1] + dp(10))
 
-        # Спавн новых кактусов
         self.obstacle_timer += 1
-        if self.obstacle_timer > 70 and len(self.obstacles) < 3:
+        if self.obstacle_timer > 55 and len(self.obstacles) < 4:
             self.obstacle_timer = 0
+            width = dp(14)
+            height = dp(32)
             obs = {
-                'x': self.width,
-                'width': 15,
-                'height': 30
+                'x': random.randint(0, int(self.width - width)),
+                'y': self.height,
+                'width': width,
+                'height': height,
+                'speed': random.randint(140, 280)
             }
             with self.canvas:
                 Color(0.3, 0.6, 0.1, 1)
                 obs['rect'] = RoundedRectangle(
-                    pos=(obs['x'], self.ground_y),
-                    size=(15, 30),
-                    radius=[5]
+                    pos=(obs['x'], obs['y']),
+                    size=(width, height),
+                    radius=[dp(5)]
                 )
             self.obstacles.append(obs)
 
-        # Движение кактусов
         for obs in self.obstacles[:]:
-            obs['x'] -= self.game_speed * dt
-            obs['rect'].pos = (obs['x'], self.ground_y)
+            obs['y'] -= obs['speed'] * dt
+            obs['rect'].pos = (obs['x'], obs['y'])
 
-            # Удаляем за экраном и добавляем очки
-            if obs['x'] + obs['width'] < 0:
+            if obs['y'] + obs['height'] < 0:
                 self.obstacles.remove(obs)
-                try:
-                    self.canvas.remove(obs['rect'])
-                except:
-                    pass
+                self.canvas.remove(obs['rect'])
                 self.score += 10
                 self.score_label.text = f"Score: {self.score}"
-
                 if self.score > self.high_score:
                     self.high_score = self.score
                     self.best_label.text = f"Best: {self.high_score}"
                     store.put("game_stats", high_score=self.high_score)
 
-            # Проверка столкновения
-            if (self.dino_x < obs['x'] + 15 and
-                    self.dino_x + 35 > obs['x'] and
-                    self.ground_y + self.dino_y < self.ground_y + 30 and
-                    self.ground_y + self.dino_y + 35 > self.ground_y):
+            if (self.dino_x < obs['x'] + obs['width'] and
+                self.dino_x + self.dino_size[0] > obs['x'] and
+                self.ground_y - self.dino_size[1] < obs['y'] + obs['height'] and
+                self.ground_y > obs['y']):
                 self.game_over()
                 return
-
-        # Увеличиваем скорость
-        self.game_speed = min(400, 200 + self.score // 200)
 
     def game_over(self):
         self.is_running = False
         if self.game_event:
             self.game_event.cancel()
 
-        # Показываем меню Game Over
-        self.show_game_over_menu()
+        self.game_over_container = FloatLayout(size_hint=(1, 1))
+
+        self.game_over_menu = BoxLayout(
+            orientation='vertical',
+            size_hint=(None, None),
+            size=(dp(250), dp(230)),
+            spacing=dp(12)
+        )
+
+        with self.game_over_menu.canvas.before:
+            Color(0, 0, 0, 0.92)
+            self.go_bg = RoundedRectangle(size=self.game_over_menu.size, radius=[dp(20)])
+
+        go_label = Label(
+            text=f"GAME OVER!\nScore: {self.score}",
+            font_size=sp(24),
+            color=(1, 0.3, 0.3, 1),
+            size_hint=(1, 0.45),
+            bold=True
+        )
+        self.game_over_menu.add_widget(go_label)
+
+        again_btn = Button(
+            text="PLAY AGAIN",
+            size_hint=(1, 0.3),
+            background_color=(0.2, 0.6, 0.2, 1),
+            color=(1, 1, 1, 1),
+            font_size=sp(17),
+            bold=True,
+            background_normal=''
+        )
+        again_btn.bind(on_press=self.restart_game)
+        self.game_over_menu.add_widget(again_btn)
+
+        exit_btn2 = Button(
+            text="EXIT",
+            size_hint=(1, 0.3),
+            background_color=(0.7, 0.2, 0.2, 1),
+            color=(1, 1, 1, 1),
+            font_size=sp(15),
+            background_normal=''
+        )
+        exit_btn2.bind(on_press=self.exit_game)
+        self.game_over_menu.add_widget(exit_btn2)
+
+        self.game_over_container.add_widget(self.game_over_menu)
+        self.add_widget(self.game_over_container)
         self.update_positions()
 
     def restart_game(self, instance):
-        # Полностью пересоздаём игру!
-        # Удаляем текущую игру
-        self.parent.remove_widget(self)
-
-        # Создаём новую игру
+        # Полностью пересоздаём игру
+        if self.parent:
+            self.parent.remove_widget(self)
         new_game = DinoGame(self.app)
-
-        # Добавляем новую игру
         self.app.content.clear_widgets()
         self.app.content.add_widget(new_game)
 
-
-# ======================
-# 🍏 IOS BUTTON
-# ======================
-class IOSButton(Button):
-    def __init__(self, bg_color, size_factor=1, **kwargs):
-        super().__init__(**kwargs)
-        self.bg_color_value = bg_color
-        self.size_factor = size_factor
-        self.background_normal = ""
-        self.background_down = ""
-        self.background_color = (0, 0, 0, 0)
-        self.color = (1, 1, 1, 1)
-        self.bold = True
-        self.font_size = 24 * size_factor
-        self.size_hint_y = None
-        self.height = 82 * size_factor
-
-        self.radius_value = 35
-
-        with self.canvas.before:
-            self.bg_color = Color(*bg_color)
-            self.bg = RoundedRectangle(radius=[self.radius_value])
-
-        self.bind(pos=self.update_graphics)
-        self.bind(size=self.update_graphics)
-
-    def update_graphics(self, *args):
-        self.bg.pos = self.pos
-        self.bg.size = self.size
-
-    def on_press(self):
-        Animation(opacity=0.65, duration=0.05).start(self)
-        try:
-            from jnius import autoclass
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            Context = PythonActivity.mActivity.getApplicationContext()
-            vibrator = Context.getSystemService(Context.VIBRATOR_SERVICE)
-            vibrator.vibrate(10)
-        except:
-            pass
-
-    def on_release(self):
-        Animation(opacity=1, duration=0.08).start(self)
-
-    def update_theme(self, color, text, size_factor, radius=35):
-        self.bg_color_value = color
-        self.bg_color.rgba = color
-        self.color = text
-        self.font_size = 24 * size_factor
-        self.height = 82 * size_factor
-        self.radius_value = radius
-        self.bg.radius = [radius]
-
-
-# ======================
-# 📟 CALCULATOR
-# ======================
-class Calculator(BoxLayout):
-    def __init__(self, app, **kwargs):
-        super().__init__(**kwargs)
-        self.app = app
-        self.orientation = "vertical"
-        self.spacing = 10
-        self.padding = 10
-        self.history = []
-        self.buttons = []
-        self.button_rows = []
-        self.waiting_for_new_number = False
-
-        self.display = TextInput(
-            readonly=True,
-            multiline=False,
-            halign="right",
-            background_color=(0, 0, 0, 0),
-            foreground_color=app.theme["text"],
-            font_size=46 * app.size_factor,
-            size_hint=(1, 0.16),
-            padding=[20, 20]
-        )
-        self.add_widget(self.display)
-
-        self.buttons_container = GridLayout(
-            cols=1,
-            spacing=8,
-            size_hint=(1, 0.84)
-        )
-        self.add_widget(self.buttons_container)
-        self.create_buttons()
-
-    def create_buttons(self):
-        self.buttons_container.clear_widgets()
-        self.buttons = []
-        self.button_rows = []
-
-        button_layouts = [
-            ["C", "+/-", "%", "/"],
-            ["7", "8", "9", "*"],
-            ["4", "5", "6", "-"],
-            ["1", "2", "3", "+"],
-            ["0", ".", "="]
-        ]
-
-        for row in button_layouts:
-            row_layout = GridLayout(
-                cols=len(row),
-                spacing=8,
-                size_hint=(1, None),
-                height=88 * self.app.size_factor
-            )
-
-            for text in row:
-                if text in ["+", "-", "*", "/", "="]:
-                    color = self.app.theme["op"]
-                elif text == "C":
-                    color = (0.6, 0.6, 0.6, 1)
-                else:
-                    color = self.app.theme["num"]
-
-                btn = IOSButton(
-                    text=text,
-                    bg_color=color,
-                    size_factor=self.app.size_factor
-                )
-
-                if text == "0":
-                    btn.size_hint_x = 2
-
-                btn.bind(on_press=self.on_button)
-                self.buttons.append(btn)
-                row_layout.add_widget(btn)
-
-            self.buttons_container.add_widget(row_layout)
-            self.button_rows.append(row_layout)
-
-    def on_button(self, instance):
-        t = instance.text
-
-        if self.waiting_for_new_number and t not in ["C", "+/-", "%", "/", "*", "-", "+", "="]:
-            self.display.text = ""
-            self.waiting_for_new_number = False
-
-        if t == "C":
-            self.display.text = ""
-            self.waiting_for_new_number = False
-        elif t == "=":
-            try:
-                expression = self.display.text.replace("×", "*")
-                expression = expression.replace("÷", "/")
-                result = str(eval(expression))
-
-                if expression == "67" or expression == "67.0" or expression == "67.00":
-                    self.start_dino_game()
-                    return
-
-                if expression == "1337" or expression == "1337.0":
-                    self.show_easter_egg()
-                    return
-
-                self.history.append(f"{expression} = {result}")
-                self.display.text = result
-                self.waiting_for_new_number = True
-            except Exception as e:
-                print(f"Error: {e}")
-                self.display.text = "Error"
-                self.waiting_for_new_number = True
-                Clock.schedule_once(self.clear, 1)
-        elif t == "+/-":
-            try:
-                self.display.text = str(-float(self.display.text))
-            except:
-                pass
-        elif t == "%":
-            try:
-                self.display.text = str(float(self.display.text) / 100)
-            except:
-                pass
-        else:
-            self.display.text += t
-
-    def start_dino_game(self):
-        print("Creating DinoGame...")
-        self.game = DinoGame(self.app)
-        print("Game created, clearing content...")
-        self.app.content.clear_widgets()
-        print("Adding game to content...")
-        self.app.content.add_widget(self.game)
-        print("Game started!")
-
-    def show_easter_egg(self):
-        self.display.text = "SECRET UNLOCKED!"
-        self.waiting_for_new_number = True
-        Clock.schedule_once(lambda dt: self.clear(0), 2)
-
-    def clear(self, dt):
-        self.display.text = ""
-        self.waiting_for_new_number = False
-
-    def resize_buttons(self):
-        self.display.font_size = 46 * self.app.size_factor
-        self.create_buttons()
-
-    def update_theme(self):
-        self.display.foreground_color = self.app.theme["text"]
-        self.display.font_size = 46 * self.app.size_factor
-
-        for btn in self.buttons:
-            if btn.text in ["+", "-", "*", "/", "="]:
-                color = self.app.theme["op"]
-            elif btn.text == "C":
-                color = (0.6, 0.6, 0.6, 1)
-            else:
-                color = self.app.theme["num"]
-
-            btn.update_theme(
-                color,
-                self.app.theme["text"],
-                self.app.size_factor,
-                self.app.theme.get("button_radius", 35)
-            )
-
-
-# ======================
+# =========================================================
 # 💱 CONVERTER
-# ======================
+# =========================================================
+
 class Converter(BoxLayout):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
         self.app = app
         self.orientation = "vertical"
-        self.spacing = 12
-        self.padding = 10
+        self.spacing = dp(10)
+        self.padding = dp(10)
         self.rates_cache = {}
-        self.last_update = 0
 
-        currency_layout = GridLayout(cols=2, spacing=10, size_hint=(1, 0.12))
+        # Currency selection row
+        currency_row = BoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), spacing=dp(10))
 
         self.from_currency = TextInput(
             text="USD",
-            hint_text="From (USD, EUR, RUB...)",
+            hint_text="From",
             multiline=False,
-            font_size=22 * app.size_factor,
+            font_size=sp(20),
             size_hint=(0.5, 1),
-            padding=[10, 10],
-            background_color=(0.1, 0.1, 0.1, 0.8)
+            padding=[dp(8), dp(8)],
+            background_color=(0.1, 0.1, 0.1, 0.8),
+            foreground_color=(1, 1, 1, 1)
         )
 
         self.to_currency = TextInput(
             text="RUB",
-            hint_text="To (USD, EUR, RUB...)",
+            hint_text="To",
             multiline=False,
-            font_size=22 * app.size_factor,
+            font_size=sp(20),
             size_hint=(0.5, 1),
-            padding=[10, 10],
-            background_color=(0.1, 0.1, 0.1, 0.8)
+            padding=[dp(8), dp(8)],
+            background_color=(0.1, 0.1, 0.1, 0.8),
+            foreground_color=(1, 1, 1, 1)
         )
 
-        currency_layout.add_widget(self.from_currency)
-        currency_layout.add_widget(self.to_currency)
+        currency_row.add_widget(self.from_currency)
+        currency_row.add_widget(self.to_currency)
 
         self.input = TextInput(
             hint_text="Enter amount",
             multiline=False,
-            font_size=34 * app.size_factor,
-            size_hint=(1, 0.1),
-            padding=[15, 15],
+            font_size=sp(32),
+            size_hint=(1, None),
+            height=dp(55),
+            padding=[dp(15), dp(15)],
             background_color=(0.1, 0.1, 0.1, 0.8),
-            input_filter='float'
+            input_filter='float',
+            foreground_color=(1, 1, 1, 1)
         )
 
         self.result = TextInput(
             readonly=True,
-            font_size=24 * app.size_factor,
+            font_size=sp(22),
             background_color=(0, 0, 0, 0),
-            foreground_color=app.theme["text"],
-            padding=[15, 15],
+            foreground_color=(1, 1, 1, 1),
+            padding=[dp(12), dp(12)],
             multiline=True,
-            size_hint=(1, 0.22)
+            size_hint=(1, None),
+            height=dp(110)
         )
 
-        button_layout = GridLayout(cols=3, spacing=8, size_hint=(1, 0.1))
+        # Buttons row
+        buttons_row = BoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(55), spacing=dp(8))
 
         self.update_btn = IOSButton(
             text="Update",
             bg_color=(0.3, 0.6, 0.3, 1),
-            size_factor=app.size_factor * 0.7
+            size_factor=0.65
         )
         self.update_btn.bind(on_press=self.update_rates)
 
         self.convert_btn = IOSButton(
             text="Convert",
             bg_color=app.theme["op"],
-            size_factor=app.size_factor * 0.7
+            size_factor=0.65
         )
         self.convert_btn.bind(on_press=self.convert)
 
         self.swap_btn = IOSButton(
             text="Swap",
             bg_color=(0.4, 0.4, 0.6, 1),
-            size_factor=app.size_factor * 0.7
+            size_factor=0.65
         )
         self.swap_btn.bind(on_press=self.swap_currencies)
 
-        button_layout.add_widget(self.update_btn)
-        button_layout.add_widget(self.convert_btn)
-        button_layout.add_widget(self.swap_btn)
+        buttons_row.add_widget(self.update_btn)
+        buttons_row.add_widget(self.convert_btn)
+        buttons_row.add_widget(self.swap_btn)
 
         self.status_label = Label(
-            text="Click Update to get latest rates",
+            text="Click Update to get rates",
             color=(0.7, 0.7, 0.7, 1),
-            size_hint=(1, 0.06),
-            font_size=12,
-            halign='center'
+            size_hint=(1, None),
+            height=dp(25),
+            font_size=sp(11)
         )
 
+        # Popular currencies
         popular_label = Label(
-            text="Popular:",
-            color=app.theme["text"],
-            size_hint=(1, 0.04),
-            font_size=14
+            text="Popular currencies:",
+            color=(1, 1, 1, 1),
+            size_hint=(1, None),
+            height=dp(30),
+            font_size=sp(14),
+            bold=True
         )
 
-        popular_layout = GridLayout(cols=4, spacing=5, size_hint=(1, 0.1))
-        popular_currencies = ["USD", "EUR", "RUB", "GBP", "JPY", "CNY", "TRY", "KZT"]
+        popular_grid = GridLayout(cols=4, spacing=dp(5), size_hint=(1, None), height=dp(130))
+
+        popular_currencies = ["USD", "EUR", "RUB", "GBP", "JPY", "CNY", "TRY", "KZT", "CAD", "AUD", "CHF", "INR", "BRL", "MXN", "SGD", "AED"]
 
         for currency in popular_currencies:
             btn = Button(
                 text=currency,
-                font_size=14,
+                font_size=sp(13),
                 size_hint=(1, 1),
                 background_normal='',
                 background_color=(0.2, 0.2, 0.3, 0.8),
                 color=(1, 1, 1, 1)
             )
             btn.bind(on_press=lambda x, c=currency: self.set_to_currency(c))
-            popular_layout.add_widget(btn)
+            popular_grid.add_widget(btn)
 
-        self.add_widget(currency_layout)
+        self.add_widget(currency_row)
         self.add_widget(self.input)
-        self.add_widget(button_layout)
+        self.add_widget(buttons_row)
         self.add_widget(self.result)
         self.add_widget(self.status_label)
         self.add_widget(popular_label)
-        self.add_widget(popular_layout)
+        self.add_widget(popular_grid)
 
         Clock.schedule_once(lambda dt: self.update_rates(None), 1)
-        Clock.schedule_interval(lambda dt: self.update_rates(None), 3600)
 
     def set_to_currency(self, currency):
         self.to_currency.text = currency
@@ -854,16 +666,12 @@ class Converter(BoxLayout):
                 data = response.json()
                 self.rates_cache = data["rates"]
                 self.rates_cache["USD"] = 1.0
-                self.last_update = data["time_last_update_unix"]
-
-                update_time = datetime.fromtimestamp(self.last_update).strftime("%H:%M:%S")
-                self.status_label.text = f"Updated! ({update_time})"
+                self.status_label.text = "Updated!"
                 self.status_label.color = (0, 1, 0, 1)
 
                 if self.input.text:
                     self.convert(None)
             else:
-                self.status_label.text = "API error, using fallback"
                 self.use_fallback_rates()
 
         except:
@@ -875,7 +683,8 @@ class Converter(BoxLayout):
         self.rates_cache = {
             "USD": 1.0, "EUR": 0.92, "RUB": 88.5, "GBP": 0.79,
             "JPY": 148.2, "CNY": 7.19, "TRY": 32.1, "KZT": 443.5,
-            "CAD": 1.36, "AUD": 1.52, "CHF": 0.91, "INR": 83.2
+            "CAD": 1.36, "AUD": 1.52, "CHF": 0.91, "INR": 83.2,
+            "BRL": 5.05, "MXN": 16.8, "SGD": 1.35, "AED": 3.67
         }
 
     def convert(self, instance):
@@ -888,12 +697,8 @@ class Converter(BoxLayout):
             from_curr = self.from_currency.text.upper().strip()
             to_curr = self.to_currency.text.upper().strip()
 
-            if from_curr not in self.rates_cache:
-                self.result.text = f"'{from_curr}' not supported"
-                return
-
-            if to_curr not in self.rates_cache:
-                self.result.text = f"'{to_curr}' not supported"
+            if from_curr not in self.rates_cache or to_curr not in self.rates_cache:
+                self.result.text = "Currency not supported"
                 return
 
             amount_in_usd = amount / self.rates_cache[from_curr]
@@ -905,47 +710,192 @@ class Converter(BoxLayout):
                 f"1 {from_curr} = {rate:.4f} {to_curr}\n"
                 f"1 {to_curr} = {1 / rate:.4f} {from_curr}"
             )
-
-            self.status_label.text = f"{amount} {from_curr} -> {to_curr}"
-
-        except ValueError:
-            self.result.text = "Enter valid number"
+            self.status_label.text = f"✅ {amount} {from_curr} → {to_curr}"
         except:
-            self.result.text = "Conversion error"
+            self.result.text = "Enter valid number"
 
     def update_theme(self):
-        self.result.foreground_color = self.app.theme["text"]
         self.convert_btn.update_theme(
             self.app.theme["op"],
-            self.app.theme["text"],
-            self.app.size_factor * 0.7,
+            (1, 1, 1, 1),
+            self.app.size_factor * 0.65,
             self.app.theme.get("button_radius", 35)
         )
+        self.result.foreground_color = (1, 1, 1, 1)
 
+# =========================================================
+# 📟 CALCULATOR
+# =========================================================
 
-# ======================
+class Calculator(BoxLayout):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        self.orientation = "vertical"
+        self.padding = dp(8)
+        self.spacing = dp(8)
+        self.history = []
+        self.buttons = []
+        self.button_rows = []
+        self.waiting_for_new_number = False
+
+        self.display = TextInput(
+            readonly=True,
+            multiline=False,
+            halign="right",
+            background_color=(0, 0, 0, 0),
+            foreground_color=(1, 1, 1, 1),
+            font_size=sp(44 * app.size_factor),
+            size_hint=(1, 0.15),
+            padding=[dp(18), dp(18)]
+        )
+        self.add_widget(self.display)
+
+        self.buttons_container = GridLayout(
+            cols=1,
+            spacing=dp(8),
+            size_hint=(1, 0.85)
+        )
+        self.add_widget(self.buttons_container)
+        self.create_buttons()
+
+    def create_buttons(self):
+        self.buttons_container.clear_widgets()
+        self.buttons = []
+        self.button_rows = []
+
+        layout = [
+            ["C", "+/-", "%", "/"],
+            ["7", "8", "9", "*"],
+            ["4", "5", "6", "-"],
+            ["1", "2", "3", "+"],
+            ["0", ".", "="]
+        ]
+
+        for row in layout:
+            row_layout = GridLayout(
+                cols=len(row),
+                spacing=dp(8),
+                size_hint=(1, None),
+                height=dp(80 * self.app.size_factor)
+            )
+
+            for text in row:
+                if text in ["+", "-", "*", "/", "="]:
+                    color = self.app.theme["op"]
+                elif text == "C":
+                    color = (0.6, 0.6, 0.6, 1)
+                else:
+                    color = self.app.theme["num"]
+
+                btn = IOSButton(
+                    text=text,
+                    bg_color=color,
+                    size_factor=self.app.size_factor
+                )
+
+                if text == "0":
+                    btn.size_hint_x = 2
+
+                btn.bind(on_press=self.on_button)
+                self.buttons.append(btn)
+                row_layout.add_widget(btn)
+
+            self.button_rows.append(row_layout)
+            self.buttons_container.add_widget(row_layout)
+
+    def on_button(self, instance):
+        t = instance.text
+
+        if self.waiting_for_new_number and t not in ["C", "+/-", "%", "/", "*", "-", "+", "="]:
+            self.display.text = ""
+            self.waiting_for_new_number = False
+
+        if t == "C":
+            self.display.text = ""
+            self.waiting_for_new_number = False
+        elif t == "=":
+            try:
+                expression = self.display.text.replace("×", "*")
+                expression = expression.replace("÷", "/")
+                result = str(eval(expression))
+
+                if expression == "67" or expression == "67.0":
+                    self.start_dino_game()
+                    return
+
+                self.history.append(f"{expression} = {result}")
+                self.display.text = result
+                self.waiting_for_new_number = True
+            except:
+                self.display.text = "Error"
+                self.waiting_for_new_number = True
+                Clock.schedule_once(self.clear, 1)
+        elif t == "+/-":
+            try:
+                self.display.text = str(-float(self.display.text))
+            except:
+                pass
+        elif t == "%":
+            try:
+                self.display.text = str(float(self.display.text) / 100)
+            except:
+                pass
+        else:
+            self.display.text += t
+
+    def start_dino_game(self):
+        self.game = DinoGame(self.app)
+        self.app.content.clear_widgets()
+        self.app.content.add_widget(self.game)
+
+    def clear(self, dt):
+        self.display.text = ""
+        self.waiting_for_new_number = False
+
+    def resize_buttons(self):
+        self.display.font_size = sp(44 * self.app.size_factor)
+        for btn in self.buttons:
+            btn.font_size = sp(24 * self.app.size_factor)
+            btn.height = dp(78 * self.app.size_factor)
+        for row in self.button_rows:
+            row.height = dp(80 * self.app.size_factor)
+
+    def update_theme(self):
+        self.display.foreground_color = (1, 1, 1, 1)
+        for btn in self.buttons:
+            if btn.text in ["+", "-", "*", "/", "="]:
+                color = self.app.theme["op"]
+            elif btn.text == "C":
+                color = (0.6, 0.6, 0.6, 1)
+            else:
+                color = self.app.theme["num"]
+            btn.update_theme(color, (1, 1, 1, 1), self.app.size_factor, self.app.theme.get("button_radius", 35))
+
+# =========================================================
 # 📜 HISTORY SCREEN
-# ======================
+# =========================================================
+
 class History(BoxLayout):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
         self.app = app
         self.orientation = "vertical"
-        self.padding = 10
-        self.spacing = 10
+        self.padding = dp(10)
+        self.spacing = dp(10)
 
         self.history_box = TextInput(
             readonly=True,
-            font_size=22,
+            font_size=sp(20),
             background_color=(0, 0, 0, 0),
-            foreground_color=app.theme["text"],
-            padding=[15, 15]
+            foreground_color=(1, 1, 1, 1),
+            padding=[dp(12), dp(12)]
         )
 
         clear_btn = IOSButton(
             text="Clear History",
             bg_color=(1, 0, 0, 1),
-            size_factor=app.size_factor
+            size_factor=0.75
         )
         clear_btn.bind(on_press=self.clear_history)
 
@@ -964,57 +914,86 @@ class History(BoxLayout):
         self.update_history()
 
     def update_theme(self):
-        self.history_box.foreground_color = self.app.theme["text"]
+        self.history_box.foreground_color = (1, 1, 1, 1)
 
+# =========================================================
+# ⚙ SETTINGS
+# =========================================================
 
-# ======================
-# ⚙️ SETTINGS
-# ======================
 class Settings(BoxLayout):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
         self.app = app
         self.orientation = "vertical"
-        self.spacing = 20
-        self.padding = 20
+        self.padding = dp(12)
+        self.spacing = dp(12)
+
+        scroll = ScrollView(size_hint=(1, 1))
+        self.container = BoxLayout(
+            orientation='vertical',
+            spacing=dp(15),
+            size_hint_y=None,
+            padding=[0, 0, 0, dp(25)]
+        )
+        self.container.bind(minimum_height=self.container.setter('height'))
 
         size_label = Label(
             text="Button Size",
-            color=app.theme["text"],
-            size_hint=(1, 0.1),
-            font_size=20
+            color=(1, 1, 1, 1),
+            size_hint=(1, None),
+            height=dp(35),
+            font_size=sp(20)
         )
 
         self.slider = Slider(
-            min=0.5,
-            max=1.5,
+            min=0.7,
+            max=1.4,
             value=app.size_factor,
-            size_hint=(1, 0.08)
+            size_hint=(1, None),
+            height=dp(35)
         )
         self.slider.bind(value=self.change_size)
 
-        theme_label = Label(
-            text="Themes",
-            color=app.theme["text"],
-            size_hint=(1, 0.1),
-            font_size=20
+        self.size_value = Label(
+            text=f"Scale: {app.size_factor:.2f}",
+            color=(1, 1, 1, 1),
+            size_hint=(1, None),
+            height=dp(25),
+            font_size=sp(14)
         )
 
-        self.add_widget(size_label)
-        self.add_widget(self.slider)
-        self.add_widget(theme_label)
+        theme_label = Label(
+            text="Themes",
+            color=(1, 1, 1, 1),
+            size_hint=(1, None),
+            height=dp(35),
+            font_size=sp(20)
+        )
 
+        self.container.add_widget(size_label)
+        self.container.add_widget(self.slider)
+        self.container.add_widget(self.size_value)
+        self.container.add_widget(theme_label)
+
+        self.theme_buttons = []
         for theme_name in THEMES.keys():
             btn = IOSButton(
                 text=theme_name,
                 bg_color=THEMES[theme_name]["top"],
-                size_factor=app.size_factor
+                size_factor=0.78
             )
+            btn.height = dp(68)
+            btn.font_size = sp(18)
             btn.bind(on_press=lambda instance, name=theme_name: self.change_theme(name))
-            self.add_widget(btn)
+            self.theme_buttons.append(btn)
+            self.container.add_widget(btn)
+
+        scroll.add_widget(self.container)
+        self.add_widget(scroll)
 
     def change_size(self, instance, value):
         self.app.size_factor = value
+        self.size_value.text = f"Scale: {value:.2f}"
         store.put("settings", size=value, theme=self.app.theme_name)
         self.app.update_all()
 
@@ -1026,12 +1005,18 @@ class Settings(BoxLayout):
         self.app.update_all()
 
     def update_theme(self):
-        pass
+        for btn in self.theme_buttons:
+            btn.update_theme(
+                THEMES[btn.text]["top"],
+                (1, 1, 1, 1),
+                0.78,
+                self.app.theme.get("button_radius", 35)
+            )
 
-
-# ======================
+# =========================================================
 # 📱 MAIN APP
-# ======================
+# =========================================================
+
 class MainApp(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1050,36 +1035,36 @@ class MainApp(BoxLayout):
 
         top = GridLayout(
             cols=4,
-            spacing=8,
-            padding=8,
-            size_hint=(1, 0.08)
+            spacing=dp(6),
+            padding=dp(6),
+            size_hint=(1, 0.07)
         )
 
         self.calc_btn = IOSButton(
             text="Calc",
             bg_color=self.theme["top"],
-            size_factor=0.75
+            size_factor=0.7
         )
         self.calc_btn.bind(on_press=lambda x: self.show("calc"))
 
         self.conv_btn = IOSButton(
             text="Conv",
             bg_color=self.theme["top"],
-            size_factor=0.75
+            size_factor=0.7
         )
         self.conv_btn.bind(on_press=lambda x: self.show("conv"))
 
         self.hist_btn = IOSButton(
             text="Hist",
             bg_color=self.theme["top"],
-            size_factor=0.75
+            size_factor=0.7
         )
         self.hist_btn.bind(on_press=lambda x: self.show("hist"))
 
         self.set_btn = IOSButton(
             text="Sets",
             bg_color=self.theme["top"],
-            size_factor=0.75
+            size_factor=0.7
         )
         self.set_btn.bind(on_press=lambda x: self.show("set"))
 
@@ -1102,7 +1087,6 @@ class MainApp(BoxLayout):
 
     def show(self, screen):
         self.content.clear_widgets()
-
         if screen == "calc":
             self.content.add_widget(self.calculator)
         elif screen == "conv":
@@ -1115,27 +1099,29 @@ class MainApp(BoxLayout):
 
     def update_all(self):
         Window.clearcolor = self.theme["bg"]
-
         self.calculator.update_theme()
         self.calculator.resize_buttons()
         self.converter.update_theme()
         self.history_screen.update_theme()
+        self.settings.update_theme()
 
-        buttons = [self.calc_btn, self.conv_btn, self.hist_btn, self.set_btn]
+        for btn in [self.calc_btn, self.conv_btn, self.hist_btn, self.set_btn]:
+            btn.update_theme(
+                self.theme["top"],
+                (1, 1, 1, 1),
+                0.7,
+                self.theme.get("button_radius", 35)
+            )
 
-        for btn in buttons:
-            btn.update_theme(self.theme["top"], self.theme["text"], 0.75, self.theme.get("button_radius", 35))
-
-
-# ======================
+# =========================================================
 # 🚀 APP
-# ======================
+# =========================================================
+
 class GlassCalculatorApp(App):
     icon = "icon.png"
 
     def build(self):
         return MainApp()
-
 
 if __name__ == "__main__":
     GlassCalculatorApp().run()
