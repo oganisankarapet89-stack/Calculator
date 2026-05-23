@@ -6,13 +6,13 @@
 [app]
 
 # (str) Title of your application
-title = Karapetyan
+title = KarCul
 
 # (str) Package name
-package.name = myapp
+package.name = karcul
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = org.test
+package.domain = org.karcul
 
 # (str) Source code where the main.py live
 source.dir = .
@@ -34,7 +34,7 @@ source.include_exts = py,png,jpg,kv,atlas
 #source.exclude_patterns = license,images/*/*.jpg
 
 # (str) Application versioning (method 1)
-version = 0.1
+version = 1.1
 
 # (str) Application versioning (method 2)
 # version.regex = __version__ = ['"](.*)['"]
@@ -98,8 +98,8 @@ fullscreen = 0
 #android.presplash_lottie = "path/to/lottie/file.json"
 
 # (str) Adaptive icon of the application (used if Android API level is 26+ at runtime)
-#icon.adaptive_foreground.filename = %(source.dir)s/data/icon_fg.png
-#icon.adaptive_background.filename = %(source.dir)s/data/icon_bg.png
+#icon = icon.png
+#icon = icon.png
 
 # (list) Permissions
 # (See https://python-for-android.readthedocs.io/en/latest/buildoptions.html for all the supported syntaxes and properties)
