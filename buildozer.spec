@@ -1,8 +1,3 @@
-# This .spec config file tells Buildozer an app's requirements for being built.
-#
-# It largely follows the syntax of an .ini file.
-# See the end of the file for more details and warnings about common mistakes.
-
 [app]
 
 # (str) Title of your application
@@ -118,7 +113,8 @@ android.minapi = 21
 android.sdk = 30
 
 # (str) Android NDK version to use
-android.ndk = 23b
+# ИСПРАВЛЕНО: NDK 23b больше не поддерживается, обновлён до 25c
+android.ndk = 25c
 
 # (int) Android NDK API to use. This is the minimum API your app will support, it should usually match android.minapi.
 android.ndk_api = 21
