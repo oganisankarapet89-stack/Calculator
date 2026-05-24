@@ -1,50 +1,24 @@
-name: Build Android APK
+[app]
+title = KarCul
+package.name = karcul
+package.domain = org.karcul
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas
+version = 1.0
+requirements = python3,kivy,requests
+orientation = portrait
+fullscreen = 1
+icon = icon.png
+android.permissions = INTERNET, VIBRATE
+android.api = 30
+android.minapi = 21
+android.sdk = 30
+android.ndk = 23b
+android.ndk_api = 21
+android.accept_sdk_license = True
+android.archs = arm64-v8a, armeabi-v7a
+android.allow_backup = True
 
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-
-    - name: Install buildozer
-      run: |
-        pip install --upgrade pip
-        pip install buildozer cython
-
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          openjdk-17-jdk \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
-          cmake \
-          libffi-dev \
-          libssl-dev
-
-    - name: Build APK
-      run: buildozer android debug
-
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: KarCul
-        path: bin/*.apk
-        retention-days: 30
+[buildozer]
+log_level = 2
+warn_on_root = 1
