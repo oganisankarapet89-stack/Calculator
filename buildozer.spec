@@ -43,10 +43,10 @@ android.minapi = 21
 android.sdk = 30
 
 # (str) Android NDK version to use
-# ИСПРАВЛЕНО: Kivy требует NDK 28c
+# ВАЖНО: Kivy 2.2.1 требует NDK 28c
 android.ndk = 28c
 
-# (int) Android NDK API to use
+# (int) Android NDK API to use (должен совпадать с minapi)
 android.ndk_api = 21
 
 # (bool) If True, then automatically accept SDK license agreements
@@ -58,6 +58,20 @@ android.archs = arm64-v8a, armeabi-v7a
 # (bool) enables Android auto backup feature
 android.allow_backup = True
 
+# (bool) If True, then skip trying to update the Android SDK
+# Рекомендуется для GitHub Actions для ускорения сборки
+# android.skip_update = False
+
+# (str) Gradle dependencies (может понадобиться для некоторых библиотек)
+# android.gradle_dependencies =
+
+# (bool) Enable AndroidX support (требуется для современных библиотек)
+android.enable_androidx = True
+
 [buildozer]
+
+# (int) Log level (0 = error only, 1 = info, 2 = debug)
 log_level = 2
+
+# (int) Display warning if buildozer is run as root
 warn_on_root = 1
