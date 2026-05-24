@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # Увеличиваем таймаут до 60 минут
 
     steps:
     - name: Checkout code
@@ -17,7 +16,7 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'  # Меняем на 3.9 (более стабильная)
+        python-version: '3.9'
 
     - name: Install buildozer
       run: |
@@ -40,20 +39,8 @@ jobs:
           libffi-dev \
           libssl-dev
 
-    - name: Cache buildozer
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.buildozer
-          .buildozer
-        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
-        restore-keys: |
-          ${{ runner.os }}-buildozer-
-
     - name: Build APK
-      run: |
-        buildozer android debug
-      timeout-minutes: 50
+      run: buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
