@@ -16,7 +16,7 @@ android.sdk = 30
 android.ndk = 28c
 android.ndk_api = 21
 android.accept_sdk_license = True
-android.archs = arm64-v8a, armeabi-v7a
+android.archs = arm64-v8a
 android.allow_backup = True
 android.enable_androidx = True
 
