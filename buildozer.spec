@@ -13,11 +13,12 @@ android.permissions = INTERNET, VIBRATE
 android.api = 30
 android.minapi = 21
 android.sdk = 30
-android.ndk = 23b
+android.ndk = 28c
 android.ndk_api = 21
 android.accept_sdk_license = True
 android.archs = arm64-v8a, armeabi-v7a
 android.allow_backup = True
+android.enable_androidx = True
 
 [buildozer]
 log_level = 2
