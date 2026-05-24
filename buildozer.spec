@@ -1,77 +1,63 @@
-[app]
+name: Build Android APK
 
-# (str) Title of your application
-title = KarCul
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
 
-# (str) Package name
-package.name = karcul
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60  # Увеличиваем таймаут до 60 минут
 
-# (str) Package domain (needed for android/ios packaging)
-package.domain = org.karcul
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-# (str) Source code where the main.py live
-source.dir = .
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'  # Меняем на 3.9 (более стабильная)
 
-# (list) Source files to include (leave empty to include all the files)
-source.include_exts = py,png,jpg,kv,atlas
+    - name: Install buildozer
+      run: |
+        pip install --upgrade pip
+        pip install buildozer cython
 
-# (str) Application versioning (method 1)
-version = 1.0
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          openjdk-17-jdk \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev
 
-# (list) Application requirements
-requirements = python3,kivy,requests
+    - name: Cache buildozer
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.buildozer
+          .buildozer
+        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+        restore-keys: |
+          ${{ runner.os }}-buildozer-
 
-# (str) Icon of the application
-icon = icon.png
+    - name: Build APK
+      run: |
+        buildozer android debug
+      timeout-minutes: 50
 
-# (list) Supported orientations
-orientation = portrait
-
-# (bool) Indicate if the application should be fullscreen or not
-fullscreen = 1
-
-# (list) Permissions
-android.permissions = INTERNET, VIBRATE
-
-# (int) Target Android API
-android.api = 30
-
-# (int) Minimum API your APK / AAB will support
-android.minapi = 21
-
-# (int) Android SDK version to use
-android.sdk = 30
-
-# (str) Android NDK version to use
-# ВАЖНО: Kivy 2.2.1 требует NDK 28c
-android.ndk = 28c
-
-# (int) Android NDK API to use (должен совпадать с minapi)
-android.ndk_api = 21
-
-# (bool) If True, then automatically accept SDK license agreements
-android.accept_sdk_license = True
-
-# (list) The Android archs to build for
-android.archs = arm64-v8a, armeabi-v7a
-
-# (bool) enables Android auto backup feature
-android.allow_backup = True
-
-# (bool) If True, then skip trying to update the Android SDK
-# Рекомендуется для GitHub Actions для ускорения сборки
-# android.skip_update = False
-
-# (str) Gradle dependencies (может понадобиться для некоторых библиотек)
-# android.gradle_dependencies =
-
-# (bool) Enable AndroidX support (требуется для современных библиотек)
-android.enable_androidx = True
-
-[buildozer]
-
-# (int) Log level (0 = error only, 1 = info, 2 = debug)
-log_level = 2
-
-# (int) Display warning if buildozer is run as root
-warn_on_root = 1
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: KarCul
+        path: bin/*.apk
+        retention-days: 30
